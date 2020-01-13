@@ -1,0 +1,35 @@
+{
+  "name": "movx",
+  "version": "1.0.0",
+  "repository": "git@github.com:eyasliu/movx.git",
+  "author": "Yuesong <liuyuesongde@163.com>",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "lib/index.js",
+  "unpkg": "dist/index.js",
+  "scripts": {
+    "compile": "rm -rf lib",
+    "build": "npm run compile && rm -rf dist && rollup -c",
+    "test": "jest --config=jest.json"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.8.0",
+    "@babel/plugin-proposal-class-properties": "^7.8.0",
+    "@babel/plugin-proposal-decorators": "^7.8.0",
+    "@babel/plugin-transform-runtime": "^7.8.0",
+    "@babel/preset-env": "^7.8.2",
+    "@babel/runtime": "^7.8.0",
+    "babel-jest": "24",
+    "jest": "24",
+    "rollup": "^1.29.0",
+    "rollup-plugin-babel-minify": "^9.1.1"
+  },
+  "peerDependencies": {
+    "mobx": ">=3.2.2",
+    "vue": "^2.4.2"
+  },
+  "dependencies": {
+    "mobx": "^5.15.1",
+    "vue": "^2.6.11"
+  }
+}
