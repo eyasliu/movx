@@ -1,17 +1,36 @@
 {
   "name": "movx",
-  "version": "1.0.0",
-  "repository": "git@github.com:eyasliu/movx.git",
-  "author": "Yuesong <liuyuesongde@163.com>",
-  "license": "MIT",
-  "main": "dist/index.js",
-  "module": "lib/index.js",
-  "unpkg": "dist/index.js",
+  "version": "1.0.2",
+  "author": "Eyasliu <liuyuesongde@163.com>",
+  "license": "Apache-2.0",
+  "main": "dist/movx.js",
+  "module": "dist/movx.js",
+  "unpkg": "dist/movx.js",
   "scripts": {
     "compile": "rm -rf lib",
     "build": "npm run compile && rm -rf dist && rollup -c",
     "test": "jest --config=jest.json"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eyasliu/movx.git"
+  },
+  "keywords": [
+    "mobx",
+    "vue",
+    "vuex",
+    "mobx-vue",
+    "vue-mobx",
+    "movx"
+  ],
+  "bugs": {
+    "url": "https://github.com/eyasliu/movx/issues"
+  },
+  "homepage": "https://github.com/eyasliu/movx#readme",
+  "files": [
+    "src/",
+    "dist/"
+  ],
   "devDependencies": {
     "@babel/core": "^7.8.0",
     "@babel/plugin-proposal-class-properties": "^7.8.0",
@@ -29,7 +48,6 @@
     "vue": "^2.4.2"
   },
   "dependencies": {
-    "mobx": "^5.15.1",
-    "vue": "^2.6.11"
+    "mobx": "^5.15.1"
   }
 }
