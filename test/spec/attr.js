@@ -73,6 +73,33 @@ test("option is object", done => {
   })
 })
 
+test("use $store", done => {
+  const counter = new Counter()
+  const vm = new Vue({
+    store: counter,
+    render(h) {
+      const vm = this
+      return h('div', `${vm.$store.num}|${vm.$store.numPlus}`)
+    }
+  }).$mount()
+  expect(vm.$el.textContent).toBe('0|1')
+  // done()
+  vm.$store.setNum(2)
+  nextTick(() => {
+    expect(vm.$el.textContent).toBe('2|3')
+    done()
+    // vm.$store.plus()
+    // nextTick(() => {
+    //   expect(vm.$el.textContent).toBe('3|4')
+    //   vm.$store.reset()
+    //   nextTick(() => {
+    //     expect(vm.$el.textContent).toBe('0|1')
+    //     done()
+    //   })
+    // })
+  })
+})
+
 test("operate in children compoment", done => {
   const counter = new Counter()
 

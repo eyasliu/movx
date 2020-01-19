@@ -1,6 +1,7 @@
 import ChangeDetector from './change-detector'
-import { createComputedProp, getMapComputed, getMapMethod } from './helper'
+import { createComputedProp, getMapComputed, getMapMethod, getComputedEntries } from './helper'
 import { MAP_STATE_FIELD, MAP_ACTION_FIELD } from './helper'
+import * as mobx from 'mobx'
 
 
 
@@ -20,30 +21,30 @@ export default function install(Vue, store) {
     } else if (store) {
       vm.$store = store
     }
-  
+
     // inject computed
     // hack compatible vuex mapState
-    if(vm.$options.computed && vm.$options.computed[MAP_STATE_FIELD]) {
+    if (vm.$options.computed && vm.$options.computed[MAP_STATE_FIELD]) {
       vm.$options[MAP_STATE_FIELD] = vm.$options.computed[MAP_STATE_FIELD]
       delete vm.$options.computed[MAP_STATE_FIELD]
     }
 
     vm.$options.computed = getMapComputed(vm).reduce(
-      (computed, {key, set}) => {
+      (computed, { key, set, get }) => {
         changeDetector.defineReactiveProperty(vm, key)
-        computed[key] = createComputedProp(changeDetector, vm.$store, vm, key, set)
+        computed[key] = createComputedProp(changeDetector, vm.$store, vm, key, set, get)
         return computed
-      }, 
+      },
       vm.$options.computed || {}
     )
-  
+
     // inject methods
     if (vm.$options.methods && vm.$options.methods[MAP_ACTION_FIELD]) {
       vm.$options[MAP_ACTION_FIELD] = vm.$options.methods[MAP_ACTION_FIELD]
       delete vm.$options.methods[MAP_ACTION_FIELD]
     }
     vm.$options.methods = getMapMethod(vm).reduce(
-      (methods, {key, method}) => {
+      (methods, { key, method }) => {
         methods[key] = method
         return methods
       },
@@ -54,12 +55,13 @@ export default function install(Vue, store) {
   function created() {
     const vm = this
     changeDetector.defineReactionList(vm, getMapComputed(vm))
+    changeDetector.defineRenderReaction(vm)
   }
 
   function beforeDestroy() {
     const vm = this
     changeDetector.removeReactionList(vm)
-    getMapComputed(vm).forEach(({key}) => changeDetector.removeReactiveProperty(vm, key))
+    getMapComputed(vm).forEach(({ key }) => changeDetector.removeReactiveProperty(vm, key))
   }
 
   Vue.mixin({

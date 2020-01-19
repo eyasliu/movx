@@ -20,7 +20,7 @@ export const MAP_ACTION_FIELD = "__$mobxMapAction__"
 //     return fn(namespace, map)
 //   }
 // }
-function isObject (obj) {
+function isObject(obj) {
   return obj !== null && typeof obj === 'object'
 }
 
@@ -29,7 +29,7 @@ function isObject (obj) {
  * @param {*} map
  * @return {Boolean}
  */
-function isValidMap (map) {
+function isValidMap(map) {
   return Array.isArray(map) || isObject(map)
 }
 
@@ -40,14 +40,14 @@ function isValidMap (map) {
  * @param {Array|Object} map
  * @return {Object}
  */
-export function normalizeMap (map) {
+export function normalizeMap(map) {
   if (!isValidMap(map)) {
     return []
   }
   return Array.isArray(map)
     ? map.map(key => ({ key, val: key }))
     : Object.keys(map).map(key => ({ key, val: map[key] }))
-  
+
 }
 
 /**
@@ -86,8 +86,38 @@ export const getParent = (store, field) => {
   return caller
 }
 
-export const createComputedProp = (changeDetector, store, vm, key, setter) => {
-  const getter = () => changeDetector.getReactiveProperty(vm, key)
+export const getComputedEntries = vm => {
+  if (!vm.$options.computed || typeof vm.$options.computed !== 'object') {
+    return []
+  }
+  return Object.keys(vm.$options.computed).reduce((m, key) => {
+    let getter = vm.$options.computed[key]
+
+    let setter = null
+    if (typeof getter === 'object' && typeof getter.set === 'function') {
+      setter = getter.set
+    }
+
+    if (typeof getter === 'object' && typeof getter.get === 'function') {
+      getter = getter.get
+    }
+    m.push({
+      key,
+      get: getter && getter.bind(vm),
+      set: setter && setter.bind(vm),
+    })
+    return m
+  }, [])
+}
+
+export const createComputedProp = (changeDetector, store, vm, key, setter, originGetter) => {
+  const getter = () => {
+    let val = changeDetector.getReactiveProperty(vm, key)
+    // if (typeof val == undefined) {
+    //   val = originGetter.call(vm)
+    // }
+    return val
+  }
 
   if (typeof setter === 'function') {
     return {
@@ -112,18 +142,19 @@ export const getMapComputed = (vm) => {
 
   opt = opt
     .concat(normalizeMap(vm.$options.$mapState))
+    // .concat(normalizeMap(vm.$options.computed))
     .concat(normalizeMap(vm.$options[MAP_STATE_FIELD]))
-  
+
   if (!opt.length) {
     return []
   }
 
   const store = vm.$store
-  return opt.map(({key, val}) => {
+  return opt.map(({ key, val }) => {
     let fieldKey = key.replace(/\//g, '.').split('.').pop()
     let getter = val
     let setter = null
-    
+
     if (typeof val === 'string') {
       // {field: 'name.x.y'}
       val = val.replace(/\//g, '.')
@@ -175,7 +206,7 @@ export const getMapMethod = vm => {
   }
 
   const store = vm.$store
-  return opt.map(({key, val}) => {
+  return opt.map(({ key, val }) => {
     let fieldKey = key.replace(/\//g, '.').split('.').pop()
     let method = val
     if (typeof method === 'string') {

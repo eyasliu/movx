@@ -40,14 +40,13 @@
     "@babel/runtime": "^7.8.0",
     "babel-jest": "24",
     "jest": "24",
+    "mobx": "^5.15.2",
     "rollup": "^1.29.0",
-    "rollup-plugin-babel-minify": "^9.1.1"
+    "rollup-plugin-babel-minify": "^9.1.1",
+    "vue": "^2.6.11"
   },
   "peerDependencies": {
-    "mobx": ">=3.2.2",
     "vue": "^2.4.2"
   },
-  "dependencies": {
-    "mobx": "^5.15.1"
-  }
+  "dependencies": {}
 }
