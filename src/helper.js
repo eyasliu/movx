@@ -111,13 +111,7 @@ export const getComputedEntries = vm => {
 }
 
 export const createComputedProp = (changeDetector, store, vm, key, setter, originGetter) => {
-  const getter = () => {
-    let val = changeDetector.getReactiveProperty(vm, key)
-    // if (typeof val == undefined) {
-    //   val = originGetter.call(vm)
-    // }
-    return val
-  }
+  const getter = () => changeDetector.getReactiveProperty(vm, key)
 
   if (typeof setter === 'function') {
     return {
@@ -129,7 +123,14 @@ export const createComputedProp = (changeDetector, store, vm, key, setter, origi
   return getter
 }
 
+const cacheComputed = {}
 export const getMapComputed = (vm) => {
+  let cacheKey = vm._uid
+  const cacheVal = cacheComputed[cacheKey]
+  if (cacheVal) {
+    return cacheVal
+  }
+
   let opt = []
 
   if (Array.isArray(vm.$options.mixins)) {
@@ -142,15 +143,37 @@ export const getMapComputed = (vm) => {
 
   opt = opt
     .concat(normalizeMap(vm.$options.$mapState))
-    // .concat(normalizeMap(vm.$options.computed))
+    .concat(normalizeMap(vm.$options.$computed))
     .concat(normalizeMap(vm.$options[MAP_STATE_FIELD]))
-
-  if (!opt.length) {
-    return []
-  }
+    // .concat(normalizeMap(vm.$options.computed))
 
   const store = vm.$store
-  return opt.map(({ key, val }) => {
+
+  // computed
+  let computedList = normalizeMap(vm.$options.computed).map(({ key, val }) => {
+    let fieldKey = key
+    let getter = val
+    let setter = null
+    if (typeof val === 'object' && typeof val.get === 'function') {
+      getter = val.get
+    }
+    if (typeof val === 'object' && typeof val.set === 'function') {
+      setter = val.set
+    }
+
+    // 用到了 $store 才加上监听，这个方法是有些挫，但暂时有用，以后再优化
+    if (!~getter.toString().indexOf('$store')) {
+      return null
+    }
+
+    return {
+      key: fieldKey,
+      get: getter,
+      set: setter,
+    }
+  }).filter(i => i)
+
+  const stateList = opt.map(({ key, val }) => {
     let fieldKey = key.replace(/\//g, '.').split('.').pop()
     let getter = val
     let setter = null
@@ -184,6 +207,15 @@ export const getMapComputed = (vm) => {
       set: setter,
     }
   })
+  
+  const list = [
+    ...computedList,
+    ...stateList,
+  ]
+
+  cacheComputed[cacheKey] = list
+
+  return list
 
 }
 export const getMapMethod = vm => {
@@ -199,6 +231,7 @@ export const getMapMethod = vm => {
 
   opt = opt
     .concat(normalizeMap(vm.$options.$mapAction))
+    .concat(normalizeMap(vm.$options.$methods))
     .concat(normalizeMap(vm.$options[MAP_ACTION_FIELD]))
 
   if (!opt.length) {

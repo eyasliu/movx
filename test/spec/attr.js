@@ -87,16 +87,51 @@ test("use $store", done => {
   vm.$store.setNum(2)
   nextTick(() => {
     expect(vm.$el.textContent).toBe('2|3')
-    done()
-    // vm.$store.plus()
-    // nextTick(() => {
-    //   expect(vm.$el.textContent).toBe('3|4')
-    //   vm.$store.reset()
-    //   nextTick(() => {
-    //     expect(vm.$el.textContent).toBe('0|1')
-    //     done()
-    //   })
-    // })
+    // done()
+    vm.$store.plus()
+    nextTick(() => {
+      expect(vm.$el.textContent).toBe('3|4')
+      vm.$store.reset()
+      nextTick(() => {
+        expect(vm.$el.textContent).toBe('0|1')
+        done()
+      })
+    })
+  })
+})
+
+test("use $store and computed", done => {
+  const counter = new Counter()
+  const vm = new Vue({
+    store: counter,
+    computed: {
+      num() {
+        return this.$store.num
+      },
+      numPlus() {
+        return this.$store.numPlus
+      }
+    },
+    render(h) {
+      const vm = this
+      return h('div', `${vm.num}|${vm.numPlus}`)
+    }
+  }).$mount()
+  expect(vm.$el.textContent).toBe('0|1')
+  // done()
+  vm.$store.setNum(2)
+  nextTick(() => {
+    expect(vm.$el.textContent).toBe('2|3')
+    // done()
+    vm.$store.plus()
+    nextTick(() => {
+      expect(vm.$el.textContent).toBe('3|4')
+      vm.$store.reset()
+      nextTick(() => {
+        expect(vm.$el.textContent).toBe('0|1')
+        done()
+      })
+    })
   })
 })
 

@@ -5,9 +5,15 @@ export default class ChangeDetector {
   constructor(Vue) {
     this.defineReactive = Vue.util.defineReactive;
     this.mobxMethods = mobx;
-    this.changeDetector = new Vue();
+    this._vm = new Vue({
+      data: { $$store: {}}
+    });
+    this.changeDetector = this._vm.$data.$$store
   }
-  defineReactiveProperty(vm, key, initHandler) {
+  // get changeDetector() {
+  //   return this._vm.$$state
+  // }
+  defineReactiveProperty(vm, key) {
     const reactivePropertyKey = this._getReactivePropertyKey(vm, key);
     this.defineReactive(this.changeDetector, reactivePropertyKey, null, null, true);
   }
@@ -28,9 +34,15 @@ export default class ChangeDetector {
     //   const computeds = getComputedEntries(vm)
     //   console.log(computeds)
     const reactivePropertyList = computeds.map(({ key, get }) => {
-      const updateReactiveProperty = value => { this.updateReactiveProperty(vm, key, value); };
+      const updateReactiveProperty = value => { 
+        this.updateReactiveProperty(vm, key, value); 
+        // vm.$forceUpdate()
+      };
       return this.mobxMethods.reaction(() => get.call(vm), updateReactiveProperty, {
-        fireImmediately: true
+        fireImmediately: true,
+        // onError(e) {
+        //   // console.log(e)
+        // }
       });
     });
     this.changeDetector[reactivePropertyListKey] = reactivePropertyList;
