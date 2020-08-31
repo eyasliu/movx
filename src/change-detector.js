@@ -10,9 +10,6 @@ export default class ChangeDetector {
     });
     this.changeDetector = this._vm.$data.$$store
   }
-  // get changeDetector() {
-  //   return this._vm.$$state
-  // }
   defineReactiveProperty(vm, key) {
     const reactivePropertyKey = this._getReactivePropertyKey(vm, key);
     this.defineReactive(this.changeDetector, reactivePropertyKey, null, null, true);
@@ -31,18 +28,12 @@ export default class ChangeDetector {
   }
   defineReactionList(vm, computeds) {
     const reactivePropertyListKey = this._getReactionListKey(vm);
-    //   const computeds = getComputedEntries(vm)
-    //   console.log(computeds)
     const reactivePropertyList = computeds.map(({ key, get }) => {
       const updateReactiveProperty = value => { 
         this.updateReactiveProperty(vm, key, value); 
-        // vm.$forceUpdate()
       };
       return this.mobxMethods.reaction(() => get.call(vm), updateReactiveProperty, {
         fireImmediately: true,
-        // onError(e) {
-        //   // console.log(e)
-        // }
       });
     });
     this.changeDetector[reactivePropertyListKey] = reactivePropertyList;

@@ -4,51 +4,6 @@
   (global = global || self, factory(global.movx = {}, global.mobx));
 }(this, (function (exports, mobx) { 'use strict';
 
-  class ChangeDetector {
-    constructor(Vue) {
-        this.defineReactive = Vue.util.defineReactive;
-        this.mobxMethods = mobx;
-        this.changeDetector = new Vue();
-    }
-    defineReactiveProperty(vm, key) {
-        const reactivePropertyKey = this._getReactivePropertyKey(vm, key);
-        this.defineReactive(this.changeDetector, reactivePropertyKey, null, null, true);
-    }
-    getReactiveProperty(vm, key) {
-        const reactivePropertyKey = this._getReactivePropertyKey(vm, key);
-        return this.changeDetector[reactivePropertyKey];
-    }
-    updateReactiveProperty(vm, key, value) {
-        const reactivePropertyKey = this._getReactivePropertyKey(vm, key);
-        this.changeDetector[reactivePropertyKey] = value;
-    }
-    removeReactiveProperty(vm, key) {
-        const reactivePropertyKey = this._getReactivePropertyKey(vm, key);
-        delete this.changeDetector[reactivePropertyKey];
-    }
-    defineReactionList(vm, fromMobxEntries) {
-        const reactivePropertyListKey = this._getReactionListKey(vm);
-        const reactivePropertyList = fromMobxEntries.map(({ key, get }) => {
-            const updateReactiveProperty = value => { this.updateReactiveProperty(vm, key, value); };
-            return this.mobxMethods.reaction(() => get.call(vm), updateReactiveProperty, {
-                fireImmediately: true
-            });
-        });
-        this.changeDetector[reactivePropertyListKey] = reactivePropertyList;
-    }
-    removeReactionList(vm) {
-        const reactivePropertyListKey = this._getReactionListKey(vm);
-        this.changeDetector[reactivePropertyListKey].forEach(dispose => dispose());
-        delete this.changeDetector[reactivePropertyListKey];
-    }
-    _getReactionListKey(vm) {
-        return vm._uid;
-    }
-    _getReactivePropertyKey(vm, key) {
-        return `${vm._uid}.${key}`;
-    }
-  }
-
   const MAP_STATE_FIELD = "__$mobxMapState__";
   const MAP_ACTION_FIELD = "__$mobxMapAction__";
 
@@ -71,7 +26,7 @@
   //     return fn(namespace, map)
   //   }
   // }
-  function isObject (obj) {
+  function isObject(obj) {
     return obj !== null && typeof obj === 'object'
   }
 
@@ -80,7 +35,7 @@
    * @param {*} map
    * @return {Boolean}
    */
-  function isValidMap (map) {
+  function isValidMap(map) {
     return Array.isArray(map) || isObject(map)
   }
 
@@ -91,14 +46,14 @@
    * @param {Array|Object} map
    * @return {Object}
    */
-  function normalizeMap (map) {
+  function normalizeMap(map) {
     if (!isValidMap(map)) {
       return []
     }
     return Array.isArray(map)
       ? map.map(key => ({ key, val: key }))
       : Object.keys(map).map(key => ({ key, val: map[key] }))
-    
+
   }
 
   /**
@@ -137,7 +92,7 @@
     return caller
   };
 
-  const createComputedProp = (changeDetector, store, vm, key, setter) => {
+  const createComputedProp = (changeDetector, store, vm, key, setter, originGetter) => {
     const getter = () => changeDetector.getReactiveProperty(vm, key);
 
     if (typeof setter === 'function') {
@@ -150,7 +105,14 @@
     return getter
   };
 
+  const cacheComputed = {};
   const getMapComputed = (vm) => {
+    let cacheKey = vm._uid;
+    const cacheVal = cacheComputed[cacheKey];
+    if (cacheVal) {
+      return cacheVal
+    }
+
     let opt = [];
 
     if (Array.isArray(vm.$options.mixins)) {
@@ -163,18 +125,41 @@
 
     opt = opt
       .concat(normalizeMap(vm.$options.$mapState))
+      .concat(normalizeMap(vm.$options.$computed))
       .concat(normalizeMap(vm.$options[MAP_STATE_FIELD]));
-    
-    if (!opt.length) {
-      return []
-    }
+      // .concat(normalizeMap(vm.$options.computed))
 
     const store = vm.$store;
-    return opt.map(({key, val}) => {
+
+    // computed
+    let computedList = normalizeMap(vm.$options.computed).map(({ key, val }) => {
+      let fieldKey = key;
+      let getter = val;
+      let setter = null;
+      if (typeof val === 'object' && typeof val.get === 'function') {
+        getter = val.get;
+      }
+      if (typeof val === 'object' && typeof val.set === 'function') {
+        setter = val.set;
+      }
+
+      // 用到了 $store 才加上监听，这个方法是有些挫，但暂时有用，以后再优化
+      if (!~getter.toString().indexOf('$store')) {
+        return null
+      }
+
+      return {
+        key: fieldKey,
+        get: getter,
+        set: setter,
+      }
+    }).filter(i => i);
+
+    const stateList = opt.map(({ key, val }) => {
       let fieldKey = key.replace(/\//g, '.').split('.').pop();
       let getter = val;
       let setter = null;
-      
+
       if (typeof val === 'string') {
         // {field: 'name.x.y'}
         val = val.replace(/\//g, '.');
@@ -203,7 +188,16 @@
         get: getter,
         set: setter,
       }
-    })
+    });
+    
+    const list = [
+      ...computedList,
+      ...stateList,
+    ];
+
+    cacheComputed[cacheKey] = list;
+
+    return list
 
   };
   const getMapMethod = vm => {
@@ -219,6 +213,7 @@
 
     opt = opt
       .concat(normalizeMap(vm.$options.$mapAction))
+      .concat(normalizeMap(vm.$options.$methods))
       .concat(normalizeMap(vm.$options[MAP_ACTION_FIELD]));
 
     if (!opt.length) {
@@ -226,7 +221,7 @@
     }
 
     const store = vm.$store;
-    return opt.map(({key, val}) => {
+    return opt.map(({ key, val }) => {
       let fieldKey = key.replace(/\//g, '.').split('.').pop();
       let method = val;
       if (typeof method === 'string') {
@@ -245,6 +240,69 @@
     })
   };
 
+  class ChangeDetector {
+    constructor(Vue) {
+      this.defineReactive = Vue.util.defineReactive;
+      this.mobxMethods = mobx;
+      this._vm = new Vue({
+        data: { $$store: {}}
+      });
+      this.changeDetector = this._vm.$data.$$store;
+    }
+    defineReactiveProperty(vm, key) {
+      const reactivePropertyKey = this._getReactivePropertyKey(vm, key);
+      this.defineReactive(this.changeDetector, reactivePropertyKey, null, null, true);
+    }
+    getReactiveProperty(vm, key) {
+      const reactivePropertyKey = this._getReactivePropertyKey(vm, key);
+      return this.changeDetector[reactivePropertyKey];
+    }
+    updateReactiveProperty(vm, key, value) {
+      const reactivePropertyKey = this._getReactivePropertyKey(vm, key);
+      this.changeDetector[reactivePropertyKey] = value;
+    }
+    removeReactiveProperty(vm, key) {
+      const reactivePropertyKey = this._getReactivePropertyKey(vm, key);
+      delete this.changeDetector[reactivePropertyKey];
+    }
+    defineReactionList(vm, computeds) {
+      const reactivePropertyListKey = this._getReactionListKey(vm);
+      const reactivePropertyList = computeds.map(({ key, get }) => {
+        const updateReactiveProperty = value => { 
+          this.updateReactiveProperty(vm, key, value); 
+        };
+        return this.mobxMethods.reaction(() => get.call(vm), updateReactiveProperty, {
+          fireImmediately: true,
+        });
+      });
+      this.changeDetector[reactivePropertyListKey] = reactivePropertyList;
+    }
+    defineRenderReaction(vm) {
+      const renderReactive = this.mobxMethods.reaction(() => {
+        if (typeof vm.$options.render === 'function') {
+          return vm._render(vm.$createElement)
+        }
+      }, () => {
+        vm.$forceUpdate();
+      }, {
+        fireImmediately: true
+      });
+      const reactivePropertyListKey = this._getReactionListKey(vm);
+      this.changeDetector[reactivePropertyListKey].push(renderReactive);
+    }
+    removeReactionList(vm) {
+      const reactivePropertyListKey = this._getReactionListKey(vm);
+      this.changeDetector[reactivePropertyListKey].forEach(dispose => dispose());
+      delete this.changeDetector[reactivePropertyListKey];
+    }
+    _getReactionListKey(vm) {
+      return vm._uid;
+    }
+    _getReactivePropertyKey(vm, key) {
+      return `${vm._uid}.${key}`;
+    }
+  }
+
   function install(Vue, store) {
     const changeDetector = new ChangeDetector(Vue);
     function beforeCreate() {
@@ -261,30 +319,30 @@
       } else if (store) {
         vm.$store = store;
       }
-    
+
       // inject computed
       // hack compatible vuex mapState
-      if(vm.$options.computed && vm.$options.computed[MAP_STATE_FIELD]) {
+      if (vm.$options.computed && vm.$options.computed[MAP_STATE_FIELD]) {
         vm.$options[MAP_STATE_FIELD] = vm.$options.computed[MAP_STATE_FIELD];
         delete vm.$options.computed[MAP_STATE_FIELD];
       }
 
       vm.$options.computed = getMapComputed(vm).reduce(
-        (computed, {key, set}) => {
+        (computed, { key, set, get }) => {
           changeDetector.defineReactiveProperty(vm, key);
           computed[key] = createComputedProp(changeDetector, vm.$store, vm, key, set);
           return computed
-        }, 
+        },
         vm.$options.computed || {}
       );
-    
+
       // inject methods
       if (vm.$options.methods && vm.$options.methods[MAP_ACTION_FIELD]) {
         vm.$options[MAP_ACTION_FIELD] = vm.$options.methods[MAP_ACTION_FIELD];
         delete vm.$options.methods[MAP_ACTION_FIELD];
       }
       vm.$options.methods = getMapMethod(vm).reduce(
-        (methods, {key, method}) => {
+        (methods, { key, method }) => {
           methods[key] = method;
           return methods
         },
@@ -295,12 +353,13 @@
     function created() {
       const vm = this;
       changeDetector.defineReactionList(vm, getMapComputed(vm));
+      changeDetector.defineRenderReaction(vm);
     }
 
     function beforeDestroy() {
       const vm = this;
       changeDetector.removeReactionList(vm);
-      getMapComputed(vm).forEach(({key}) => changeDetector.removeReactiveProperty(vm, key));
+      getMapComputed(vm).forEach(({ key }) => changeDetector.removeReactiveProperty(vm, key));
     }
 
     Vue.mixin({
